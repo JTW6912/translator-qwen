@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qwen 翻译 · AMD Token Factory</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; background: #f6f7f9; color: #1a1a1a; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  .sub { color: #666; margin: 0 0 20px; font-size: 14px; line-height: 1.6; }
+  .sub code { background: #eee; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  .badge { display: inline-block; background: #e6f4ea; color: #137333; padding: 3px 10px; border-radius: 999px; font-size: 12px; margin-bottom: 16px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .langs { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  select, input[type=text], input[type=password] { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: #fff; }
+  select { min-width: 150px; }
+  .swap { border: 1px solid #d1d5db; background: #fff; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  textarea { width: 100%; min-height: 180px; padding: 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px; line-height: 1.6; resize: vertical; font-family: inherit; }
+  textarea[readonly] { background: #f9fafb; }
+  .label { font-size: 13px; color: #666; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+  button.primary { background: #111; color: #fff; border: none; padding: 11px 22px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+  button.primary:disabled { opacity: .5; cursor: wait; }
+  button.ghost { background: #fff; border: 1px solid #d1d5db; padding: 11px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  .status { font-size: 13px; color: #666; margin-top: 12px; min-height: 18px; }
+  .status.error { color: #b3261e; }
+  .status.ok { color: #137333; }
+  details { font-size: 13px; color: #555; line-height: 1.7; }
+  details summary { cursor: pointer; font-weight: 600; color: #333; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row label { font-size: 13px; color: #666; }
+  .key-input { flex: 1; min-width: 260px; }
+  .hint { font-size: 12px; color: #888; line-height: 1.6; margin-top: 8px; }
+  .examples { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .examples button { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge">短期测试 · Qwen3.8-Flash-Next · 11/11 退役前可用</div>
+  <h1>网页翻译</h1>
+  <p class="sub">模型：<code>Qwen3.8-Flash-Next</code> &nbsp;·&nbsp; 接口：<code>https://developer.amd.com.cn/radeon/api/v1</code>（AMD Token Factory，OpenAI 兼容）<br>
+  说明：AMD 接口不支持浏览器跨域直连，本站优先走同源代理 <code>/api/translate</code>（Vercel Serverless），Key 存在服务端，不会暴露在网页源码里。</p>
+
+  <div class="card">
+    <div class="langs">
+      <select id="srcLang">
+        <option value="auto">自动检测</option>
+        <option value="中文">中文</option>
+        <option value="English">English</option>
+        <option value="日本語">日本語</option>
+        <option value="한국어">한국어</option>
+        <option value="Français">Français</option>
+        <option value="Deutsch">Deutsch</option>
+        <option value="Español">Español</option>
+      </select>
+      <button class="swap" id="swapBtn" title="交换语言">⇄</button>
+      <select id="dstLang">
+        <option value="English">English</option>
+        <option value="中文">中文</option>
+        <option value="日本語">日本語</option>
+        <option value="한국어">한국어</option>
+        <option value="Français">Français</option>
+        <option value="Deutsch">Deutsch</option>
+        <option value="Español">Español</option>
+      </select>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="label"><span>原文</span><span id="srcCount">0 字</span></div>
+        <textarea id="srcText" placeholder="输入要翻译的文字…&#10;例如：你好世界"></textarea>
+        <div class="examples">
+          <button data-text="你好世界">你好世界</button>
+          <button data-text="今天天气很好，我们去公园散步吧。">日常句子</button>
+          <button data-text="Hello, how are you today?">English → 中文</button>
+        </div>
+      </div>
+      <div>
+        <div class="label"><span>译文</span><span id="dstLangLabel">English</span></div>
+        <textarea id="dstText" readonly placeholder="翻译结果会显示在这里…"></textarea>
+        <div class="actions">
+          <button class="ghost" id="copyBtn">复制译文</button>
+          <button class="ghost" id="clearBtn">清空</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="translateBtn">翻译</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <details open>
+      <summary>设置（可选）</summary>
+      <div style="margin-top:12px">
+        <div class="row">
+          <label for="apiKey">API Key（仅在本地 / GitHub Pages 直连时用，存在你自己浏览器里）</label>
+          <input class="key-input" type="password" id="apiKey" placeholder="rc-..." autocomplete="off">
+          <button class="ghost" id="saveKeyBtn">保存到本机</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label for="proxyUrl">代理地址（Vercel 部署后留空即可；Pages 版可填 Vercel 地址，如 https://xxx.vercel.app）</label>
+          <input class="key-input" type="text" id="proxyUrl" placeholder="留空 = 同源 /api/translate">
+        </div>
+        <p class="hint">部署在 Vercel 上时，Key 应设为环境变量 AMD_API_KEY，不要写进代码。GitHub Pages 是纯静态站，没有后端，填 Key 后浏览器直连 AMD 会被 CORS 拦住，所以 Pages 版只适合看界面，真正翻译请用 Vercel 版链接。</p>
+      </div>
+    </details>
+  </div>
+
+  <p class="hint">注意：Qwen3.8-Flash-Next 在 AMD 上标注 11/11 退役，只适合这几天的短期测试。长期用请把模型换成 DeepSeek-V4.1-Flash（同 Key、改个模型名就能用）。每日额度约 $5，北京时间 00:00 重置。</p>
+</div>
+
+<script>
+const MODEL = "Qwen3.8-Flash-Next";
+const AMD_URL = "https://developer.amd.com.cn/radeon/api/v1/chat/completions";
+const srcText = document.getElementById('srcText');
+const dstText = document.getElementById('dstText');
+const srcLang = document.getElementById('srcLang');
+const dstLang = document.getElementById('dstLang');
+const statusEl = document.getElementById('status');
+const translateBtn = document.getElementById('translateBtn');
+
+document.getElementById('apiKey').value = localStorage.getItem('amd_api_key') || '';
+document.getElementById('proxyUrl').value = localStorage.getItem('proxy_url') || '';
+document.getElementById('dstLangLabel').textContent = dstLang.value;
+dstLang.addEventListener('change', () => document.getElementById('dstLangLabel').textContent = dstLang.value);
+
+srcText.addEventListener('input', () => document.getElementById('srcCount').textContent = srcText.value.length + ' 字');
+document.querySelectorAll('.examples button').forEach(b => b.addEventListener('click', () => {
+  srcText.value = b.dataset.text;
+  document.getElementById('srcCount').textContent = srcText.value.length + ' 字';
+  if (b.dataset.text.startsWith('Hello')) { srcLang.value = 'English'; dstLang.value = '中文'; document.getElementById('dstLangLabel').textContent = '中文'; }
+}));
+document.getElementById('swapBtn').addEventListener('click', () => {
+  if (srcLang.value === 'auto') return;
+  const a = srcLang.value; srcLang.value = dstLang.value; dstLang.value = a;
+  document.getElementById('dstLangLabel').textContent = dstLang.value;
+  const t = srcText.value; srcText.value = dstText.value; dstText.value = t;
+});
+document.getElementById('clearBtn').addEventListener('click', () => { srcText.value=''; dstText.value=''; statusEl.textContent=''; document.getElementById('srcCount').textContent='0 字'; });
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  if (!dstText.value) return;
+  await navigator.clipboard.writeText(dstText.value);
+  statusEl.textContent = '已复制'; statusEl.className = 'status ok';
+});
+document.getElementById('saveKeyBtn').addEventListener('click', () => {
+  localStorage.setItem('amd_api_key', document.getElementById('apiKey').value.trim());
+  localStorage.setItem('proxy_url', document.getElementById('proxyUrl').value.trim());
+  statusEl.textContent = '已保存到本机浏览器'; statusEl.className = 'status ok';
+});
+srcText.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') doTranslate(); });
+translateBtn.addEventListener('click', doTranslate);
+
+async function doTranslate() {
+  const text = srcText.value.trim();
+  if (!text) { statusEl.textContent = '请先输入原文'; statusEl.className = 'status error'; return; }
+  const target = dstLang.value;
+  const source = srcLang.value;
+  const t0 = Date.now();
+  translateBtn.disabled = true;
+  translateBtn.textContent = '翻译中…';
+  statusEl.textContent = ''; statusEl.className = 'status';
+  dstText.value = '';
+  try {
+    // 1) 优先走代理（Vercel / 本地 server.js），Key 在服务端
+    const proxyBase = (document.getElementById('proxyUrl').value.trim() || '').replace(/\/$/, '');
+    const proxyUrl = proxyBase ? proxyBase + '/api/translate' : '/api/translate';
+    let res = await fetch(proxyUrl, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, source, target, model: MODEL })
+    }).catch(() => null);
+
+    let data = null;
+    if (res && res.ok) {
+      data = await res.json();
+    } else {
+      // 2) 代理不可用时，尝试浏览器直连（需要用户填 Key；AMD 目前无 CORS，多数浏览器会失败并提示）
+      const key = document.getElementById('apiKey').value.trim();
+      if (!key) throw new Error('代理不可用，且未填 API Key。请部署 Vercel 版，或在设置里填 Key 后重试。' + (res ? '（代理返回 ' + res.status + '）' : ''));
+      const sys = source === 'auto'
+        ? `You are a professional translator. Translate the user text to ${target}. Output ONLY the translation, no explanation, no quotes.`
+        : `You are a professional translator. Translate the following ${source} text to ${target}. Output ONLY the translation, no explanation, no quotes.`;
+      const r2 = await fetch(AMD_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({ model: MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: text }], max_tokens: 1000, temperature: 0.1 })
+      });
+      if (!r2.ok) throw new Error('AMD 直连失败 HTTP ' + r2.status + '（大概率是 CORS，浏览器不允许直连 AMD，请用 Vercel 代理版）');
+      data = await r2.json();
+      data = { translation: data.choices?.[0]?.message?.content?.trim() || '' };
+    }
+
+    if (!data.translation) throw new Error('没有拿到译文，请重试');
+    dstText.value = data.translation;
+    statusEl.textContent = `完成，用时 ${((Date.now() - t0) / 1000).toFixed(1)}s · ${MODEL}`;
+    statusEl.className = 'status ok';
+  } catch (err) {
+    statusEl.textContent = err.message || String(err);
+    statusEl.className = 'status error';
+  } finally {
+    translateBtn.disabled = false;
+    translateBtn.textContent = '翻译';
+  }
+}
+</script>
+</body>
+</html>

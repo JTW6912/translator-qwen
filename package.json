@@ -1,0 +1,1 @@
+{"description":"Web translator using AMD Token Factory Qwen3.8-Flash-Next (short-term test)","engines":{"node":">=18"},"name":"translator-qwen","scripts":{"start":"node server.js"},"version":"1.0.0"}
