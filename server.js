@@ -30,7 +30,7 @@ const server = http.createServer(async (req, res) => {
     await models(req, res);
     return;
   }
-  const file = req.url === '/' ? 'index.html' : req.url.slice(1);
+  const file = req.url === '/' ? 'public/index.html' : (req.url.startsWith('/public/') ? req.url.slice(1) : req.url.slice(1));
   const fp = path.join(__dirname, file);
   if (!fs.existsSync(fp) || fs.statSync(fp).isDirectory()) { res.writeHead(404); return res.end('not found'); }
   res.writeHead(200, { 'Content-Type': file.endsWith('.html') ? 'text/html; charset=utf-8' : 'text/plain' });
