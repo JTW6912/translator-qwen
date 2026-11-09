@@ -5,6 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const translate = require('./api/translate');
+const models = require('./api/models');
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(async (req, res) => {
@@ -23,6 +24,11 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/api/translate' && req.method === 'OPTIONS') {
     res.writeHead(200, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
     return res.end();
+  }
+  if (req.url === '/api/models') {
+    res.status = (code) => ({ json: (obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(obj)); }, end: () => res.end() });
+    await models(req, res);
+    return;
   }
   const file = req.url === '/' ? 'index.html' : req.url.slice(1);
   const fp = path.join(__dirname, file);
